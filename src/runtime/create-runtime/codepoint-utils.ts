@@ -1,12 +1,11 @@
 import type { FontEntry } from "../../fonts";
 
+// Like Ghostty, only codepoints Unicode gives emoji presentation by default draw as emoji
+// without VS16; the rest (⏺ ✳ ⎿) keep their text glyphs.
+const EMOJI_PRESENTATION_RE = /\p{Emoji_Presentation}/u;
+
 export function isLikelyEmojiCodepoint(cp: number): boolean {
-  if (cp >= 0x1f1e6 && cp <= 0x1f1ff) return true;
-  if (cp >= 0x1f300 && cp <= 0x1faff) return true;
-  if (cp >= 0x2300 && cp <= 0x23ff) return true;
-  if (cp >= 0x2600 && cp <= 0x27bf) return true;
-  if (cp >= 0x2b50 && cp <= 0x2b55) return true;
-  return false;
+  return EMOJI_PRESENTATION_RE.test(String.fromCodePoint(cp));
 }
 
 export function isVariationSelectorCodepoint(cp: number): boolean {

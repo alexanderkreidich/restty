@@ -67,14 +67,28 @@ test("emoji presentation treats OpenMoji as an emoji fallback", () => {
   expect(isColorEmojiFont(state.fonts[1])).toBe(true);
 });
 
-test("emoji-like symbols without selectors prefer color emoji fonts", () => {
+test("emoji-presentation symbols without selectors prefer color emoji fonts", () => {
   const state = createFontManagerState();
   state.fonts = [
-    createFontEntry(makeFont([0x270d]), "Primary Mono"),
-    createFontEntry(makeFont([0x270d]), "Noto Color Emoji"),
+    createFontEntry(makeFont([0x231a]), "Primary Mono"),
+    createFontEntry(makeFont([0x231a]), "Noto Color Emoji"),
   ];
-  const picked = pickFontIndexForText(state, String.fromCodePoint(0x270d), 1);
+  const picked = pickFontIndexForText(state, String.fromCodePoint(0x231a), 1);
   expect(picked).toBe(1);
+});
+
+test("text-default symbols without selectors keep text fonts like Ghostty", () => {
+  const state = createFontManagerState();
+  const symbols = [0x23fa, 0x2733, 0x270d];
+  state.fonts = [
+    createFontEntry(makeFont([0x41]), "Primary Mono"),
+    createFontEntry(makeFont(symbols), "Noto Sans Symbols 2"),
+    createFontEntry(makeFont([...symbols, 0xfe0f]), "Noto Color Emoji"),
+  ];
+  for (const cp of symbols) {
+    expect(pickFontIndexForText(state, String.fromCodePoint(cp), 1)).toBe(1);
+    expect(pickFontIndexForText(state, `${String.fromCodePoint(cp)}\ufe0f`, 1)).toBe(2);
+  }
 });
 
 test("text presentation selector prefers non-emoji fonts", () => {
@@ -187,10 +201,15 @@ test("font classification accepts filename-derived labels", () => {
   expect(isNerdSymbolFont(createFontEntry(sampleFont, "SymbolsNerdFont-Regular.ttf"))).toBe(true);
 });
 
-test("runtime emoji heuristic includes common symbol ranges", () => {
+test("runtime emoji heuristic follows Unicode emoji presentation", () => {
   expect(isLikelyEmojiCodepoint(0x231a)).toBe(true);
-  expect(isLikelyEmojiCodepoint(0x270d)).toBe(true);
   expect(isLikelyEmojiCodepoint(0x2b50)).toBe(true);
+  expect(isLikelyEmojiCodepoint(0x1f1fa)).toBe(true);
+  expect(isLikelyEmojiCodepoint(0x1f600)).toBe(true);
+  expect(isLikelyEmojiCodepoint(0x23fa)).toBe(false);
+  expect(isLikelyEmojiCodepoint(0x23bf)).toBe(false);
+  expect(isLikelyEmojiCodepoint(0x2733)).toBe(false);
+  expect(isLikelyEmojiCodepoint(0x270d)).toBe(false);
 });
 
 test("default local fallback includes robust Apple matcher aliases", () => {
