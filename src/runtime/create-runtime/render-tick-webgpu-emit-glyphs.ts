@@ -65,7 +65,8 @@ export function emitWebGPUQueuedGlyphs(params: EmitWebGPUQueuedGlyphsParams) {
         }
         if (!symbolLike && fontIndex === 0) {
           const advancePx = item.shaped.advance * scale;
-          if (advancePx > maxWidth && advancePx > 0) {
+          // Cell widths are pixel-rounded too: rounding is not glyph overflow.
+          if (Math.round(advancePx) > maxWidth && advancePx > 0) {
             itemScale = scale * (maxWidth / advancePx);
           }
         }
