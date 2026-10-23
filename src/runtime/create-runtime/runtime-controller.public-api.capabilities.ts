@@ -114,9 +114,11 @@ export function createRuntimeTerminalView({
     setRenderer,
     setPaused: (value: boolean) => {
       internalState.paused = Boolean(value);
+      if (!internalState.paused) internalState.wakeRenderLoop?.();
     },
     togglePause: () => {
       internalState.paused = !internalState.paused;
+      if (!internalState.paused) internalState.wakeRenderLoop?.();
     },
     setFontSize: terminalCapabilities.setFontSize,
     setLigatures: terminalCapabilities.setLigatures,

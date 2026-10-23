@@ -24,4 +24,6 @@ export type RuntimeControllerInternalState = {
   preferredRenderer: PreferredRenderer;
   rafId: number;
   nextBlinkTime: number;
+  /** Runs an idle render loop again (unpausing): set by the controller. */
+  wakeRenderLoop?: () => void;
 };

@@ -41,6 +41,8 @@ export type RuntimeControllerPublicCapabilities = {
 
 export type RuntimeController = {
   sendInput: RuntimeSendInput;
+  /** The screen was marked for drawing: an idle render loop takes the next frame. */
+  wakeRenderLoop: () => void;
   createPublicApi: (capabilities: RuntimeControllerPublicCapabilities) => ResttyRuntime;
 };
 
@@ -89,6 +91,10 @@ export type RuntimeControllerRenderDeps = {
   BACKGROUND_RENDER_FPS: number;
   tickWebGPU: (state: WebGPUState) => void;
   tickWebGL: (state: WebGLState) => void;
+  /** The screen changes with time alone: the render loop runs every frame. */
+  isAnimated?: () => boolean;
+  /** The cursor drawn last blinks: an idle render loop wakes for each blink. */
+  isCursorBlinking?: () => boolean;
 };
 
 export type RuntimeControllerLifecycleDeps = {
