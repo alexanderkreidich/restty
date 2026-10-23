@@ -24,7 +24,11 @@ export function createRuntimeController(options: RuntimeControllerOptions): Runt
     nextBlinkTime: performance.now() + render.CURSOR_BLINK_MS,
   };
   const maxScrollbackBytes = resolveMaxScrollbackBytes(lifecycleDeps);
-  const { loop } = createRuntimeControllerRenderLoop({
+  const {
+    loop,
+    wake: wakeRenderLoop,
+    stop: stopRenderLoop,
+  } = createRuntimeControllerRenderLoop({
     internalState,
     readState: state.readState,
     writeState: state.writeState,
@@ -35,7 +39,10 @@ export function createRuntimeController(options: RuntimeControllerOptions): Runt
     isSynchronizedOutput: () => runtime.inputHandler.isSynchronizedOutput?.() ?? false,
     tickWebGPU: render.tickWebGPU,
     tickWebGL: render.tickWebGL,
+    isAnimated: render.isAnimated,
+    isCursorBlinking: render.isCursorBlinking,
   });
+  internalState.wakeRenderLoop = wakeRenderLoop;
   const { sendInput, clearScreen } = createRuntimeControllerInput({
     ptyTransport: runtime.ptyTransport,
     inputHandler: runtime.inputHandler,
@@ -101,10 +108,12 @@ export function createRuntimeController(options: RuntimeControllerOptions): Runt
     internalState,
     maxScrollbackBytes,
     loop,
+    stopLoop: stopRenderLoop,
   });
 
   return {
     sendInput,
+    wakeRenderLoop,
     createPublicApi: (publicApiCapabilities) =>
       createRuntimePublicApi({
         runtimeEvents: options.runtimeEvents,

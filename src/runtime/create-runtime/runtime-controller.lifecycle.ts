@@ -42,6 +42,8 @@ type RuntimeControllerLifecycleOptions = {
   internalState: RuntimeControllerInternalState;
   maxScrollbackBytes: number;
   loop: (state: WebGPUState | WebGLState) => void;
+  /** Ends the render loop on the current surface. */
+  stopLoop: () => void;
 };
 
 type RuntimeControllerLifecycle = {
@@ -81,6 +83,7 @@ export function createRuntimeControllerLifecycle(
     internalState,
     maxScrollbackBytes,
     loop,
+    stopLoop,
   } = options;
 
   let lifecycleState: ResttyRuntimeLifecycleState = "created";
@@ -186,7 +189,7 @@ export function createRuntimeControllerLifecycle(
     setLifecycleState("initializing");
 
     try {
-      cancelAnimationFrame(internalState.rafId);
+      stopLoop();
       updateSize();
 
       await ensureFont();
@@ -278,7 +281,7 @@ export function createRuntimeControllerLifecycle(
     if (lifecycleState === "destroyed") return;
     lifecycleEpoch += 1;
     setLifecycleState("destroyed");
-    cancelAnimationFrame(internalState.rafId);
+    stopLoop();
     internalState.backend = "none";
     lifecycleThemeSizeRuntime.cancelScheduledSizeUpdate();
     ptyInputRuntime.cancelSyncOutputReset();

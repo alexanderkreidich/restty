@@ -318,6 +318,11 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
   let lastKeydownSeq = "";
   let lastKeydownSeqAt = 0;
   let runtimeController: RuntimeController | null = null;
+  /** Marks the screen for drawing; an idle render loop takes the next frame for it. */
+  const requestRender = () => {
+    needsRender = true;
+    runtimeController?.wakeRenderLoop();
+  };
   function sendInput(text: string, source = "program", config: { skipHooks?: boolean } = {}) {
     runtimeController?.sendInput(text, source, config);
   }
@@ -356,7 +361,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     getCanvasSize: () => ({ width: canvas.width, height: canvas.height }),
     getActiveWebGLState: () => (activeState && "gl" in activeState ? activeState : null),
     onShaderStagesChanged: () => {
-      needsRender = true;
+      requestRender();
     },
   });
   const {
@@ -436,7 +441,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     getWasmExports: () => wasmExports,
     updateLinkHover,
     markNeedsRender: () => {
-      needsRender = true;
+      requestRender();
     },
     markSearchDirty: () => {
       searchRuntime.markDirty();
@@ -463,13 +468,13 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     getWasm: () => wasm,
     getWasmHandle: () => wasmHandle,
     markNeedsRender: () => {
-      needsRender = true;
+      requestRender();
     },
   });
   const kittyRenderRuntime = createKittyRenderRuntime({
     getWasm: () => wasm,
     markNeedsRender: () => {
-      needsRender = true;
+      requestRender();
     },
   });
   const {
@@ -606,7 +611,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     }
     updateGrid();
     wasm?.renderUpdate?.(wasmHandle);
-    needsRender = true;
+    requestRender();
   }
 
   const resolveGlyphPixelMode = (entry: FontEntry): number =>
@@ -649,7 +654,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     getWasmHandle: () => wasmHandle,
     ptyTransport,
     setNeedsRender: () => {
-      needsRender = true;
+      requestRender();
     },
     markSearchDirty: () => {
       searchRuntime.markDirty();
@@ -707,7 +712,10 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     setCurrentContextType: (value) => (currentContextType = value),
     getActiveState: () => activeState,
     getInputHandler: () => inputHandler,
-    setIsFocused: (value) => (isFocused = value),
+    setIsFocused: (value) => {
+      if (value !== isFocused) requestRender();
+      isFocused = value;
+    },
     getActiveTheme: () => activeTheme,
     setActiveTheme: (theme) => (activeTheme = theme),
     setDefaultBg: (value) => (defaultBg = value),
@@ -731,7 +739,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     destroyWebGLStageTargets,
     destroyWebGPUStageTargets,
     setShaderStagesDirty,
-    markNeedsRender: () => (needsRender = true),
+    markNeedsRender: requestRender,
     resetLastRenderTime: () => (lastRenderTime = 0),
   });
   const {
@@ -766,7 +774,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
         linkState.hoverId = 0;
         linkState.hoverUri = "";
         updateCanvasCursor();
-        needsRender = true;
+        requestRender();
       }
       return;
     }
@@ -776,7 +784,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
         linkState.hoverId = 0;
         linkState.hoverUri = "";
         updateCanvasCursor();
-        needsRender = true;
+        requestRender();
       }
       return;
     }
@@ -787,13 +795,13 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
       linkState.hoverId = 0;
       linkState.hoverUri = "";
       updateCanvasCursor();
-      needsRender = true;
+      requestRender();
       return;
     }
     linkState.hoverId = linkId;
     linkState.hoverUri = resolveLinkUri(lastRenderState, linkId);
     updateCanvasCursor();
-    needsRender = true;
+    requestRender();
   }
 
   function releaseFontLease() {
@@ -823,7 +831,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
 
     await ensureFont();
     updateGrid();
-    needsRender = true;
+    requestRender();
   }
 
   function invalidateFontAtlasesForHinting() {
@@ -838,7 +846,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     if (activeState?.glyphAtlases) {
       activeState.glyphAtlases = new Map();
     }
-    needsRender = true;
+    requestRender();
   }
 
   function setFontHinting(value: boolean) {
@@ -852,7 +860,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     const next = Boolean(value);
     if (ligatures === next) return;
     ligatures = next;
-    needsRender = true;
+    requestRender();
   }
 
   function setFontHintTarget(value: ResttyFontHintTarget) {
@@ -1115,6 +1123,7 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
     lastKeydownSeqAt,
   });
   const writeRuntimeControllerState = (patch: Partial<RuntimeControllerSharedState>) => {
+    const focusChanged = patch.isFocused !== undefined && patch.isFocused !== isFocused;
     ({
       wasm = wasm,
       wasmExports = wasmExports,
@@ -1128,6 +1137,8 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
       lastKeydownSeq = lastKeydownSeq,
       lastKeydownSeqAt = lastKeydownSeqAt,
     } = patch);
+    if (focusChanged) needsRender = true;
+    if (needsRender && (patch.needsRender || focusChanged)) runtimeController?.wakeRenderLoop();
   };
   cleanupFns.push(() => {
     kittyRenderRuntime.clearKittyRenderCaches();
@@ -1174,6 +1185,19 @@ export function createResttyRuntime(options: ResttyRuntimeConfig): ResttyRuntime
       BACKGROUND_RENDER_FPS,
       tickWebGPU,
       tickWebGL,
+      // shader stages animate with time; a Kitty image may be an animation
+      isAnimated: () =>
+        getShaderStages().length > 0 ||
+        Boolean(wasm && wasmHandle && wasm.getKittyPlacements(wasmHandle).length > 0),
+      // the cursor blinks only focused and visible (resolveCursorStyle draws an unfocused one hollow)
+      isCursorBlinking: () => {
+        const cursor = lastRenderState?.cursor;
+        if (!cursor || cursor.visible === 0) return false;
+        if ((cursor.blinking || 0) === 0 && !FORCE_CURSOR_BLINK) return false;
+        const imeFocused =
+          typeof document !== "undefined" && imeInput ? document.activeElement === imeInput : false;
+        return isFocused || imeFocused;
+      },
     },
     lifecycle: {
       cleanupFns,
